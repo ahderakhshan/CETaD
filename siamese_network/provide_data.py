@@ -44,6 +44,16 @@ class DataProvider:
             all_test_hypothesis += anli_test_hypothesis
             all_test_lables += anli_test_labels
             logger.info("anli dataset loaded")
+        if "SICK" in self.datasets:
+            sick_train_premises, sick_train_hypothesis, sick_train_labels,\
+            sick_test_premises, sick_test_hypothesis, sick_test_labels = self._provide_sick()
+            all_train_premises += sick_train_premises
+            all_train_hypothesis += sick_train_hypothesis
+            all_train_labels += sick_train_labels
+            all_test_premises += sick_test_premises
+            all_test_hypothesis += sick_test_hypothesis
+            all_test_lables += sick_test_labels
+            logger.info("sick dataset loaded")
         logger.info(f"datasets {self.datasets} loaded")
         return all_train_premises, all_train_hypothesis, all_train_labels, all_test_premises, all_test_hypothesis, all_test_lables
 
@@ -106,6 +116,23 @@ class DataProvider:
             anli_test_dataset3["label"])
         return anli_train_premises, anli_train_hypothesis, anli_train_labels,\
                anli_test_premises, anli_test_hypothesis, anli_test_labels
+
+    def _provide_sick(self):
+        sick_dataset = load_dataset("ahderakhshan/SICK")
+        sick_train_dataset, sick_test_dataset = sick_dataset["train"], sick_dataset["test"]
+
+        sick_train_premises = list(sick_train_dataset["premise"])
+        sick_train_hypothesis = list(sick_train_dataset["hypothesis"])
+        sick_train_labels = list(sick_test_dataset["label"])
+
+        sick_test_premises = list(sick_test_dataset["premise"])
+        sick_test_hypothesis = list(sick_test_dataset["hypothesis"])
+        sick_test_labels = list(sick_test_dataset["label"])
+
+        return sick_train_premises, sick_train_hypothesis, sick_train_labels,\
+               sick_test_premises, sick_test_hypothesis, sick_test_labels
+
+
 
 
 class NLIDataset(Dataset):
