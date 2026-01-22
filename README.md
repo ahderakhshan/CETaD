@@ -1,7 +1,8 @@
-# CEMaT: Contradiction Extraction from Medical Texts using Natural Language Inference
+# CETaD: Contradiction Extraction from Textual Data using Siamese Network Embeddings
 
 
-This is the implementation of the paper CEMaT: Contradiction Extraction from Medical Texts using Natural Language Inference.
+This is the implementation of the paper CETaD: Contradiction Extraction from Textual Data using Siamese Network Embeddings.
+
 
 ## Overview
 ![Architecture of CEMaT: 1- Siamese Network is trained on NLI datasets. 2- Medical Texts Filtered by name of Drug/Disease 3- Using trained siamese network retrieved texts covert to their embeddings 4- Select representative points](./cemat.png)
@@ -12,25 +13,26 @@ To train Siamese network use following command
 
 ```bash
 python train_siamese_network.py \
-    --model_name_or_path bert-base-uncased \
+    --model_name_or_path roberta-large \
     --data SNLI MNLI \
     --tokenizer_max_length 128 \
     --epochs 6 \
     --learning_rate 2e-5 \
-    --no_unfreeze_layer 4 
+    --no_unfreeze_layer 6 
 ```
 more arguments to customize training siamese network and arguments demonstrations can be found in 
 ``train_siamese_network.py`` file.
 
-### Compute PMI
-to computing PMI for each term in training data you should use following command
+### Compute p
+PPMI
+to computing PPMI for each term in training data you should use following command
 ```bash
-python compute_pmi.py \
+python compute_ppmi.py \
   --data SNLI MNLI \
   --min_freq 10 \
-  --output_path ./pmi 
+  --output_path ./ppmi 
 ```
-this will store pmi.pkl and terms.pkl file in output_path which can be used in contradiction extraction.
+this will store ppmi.pkl and terms.pkl file in output_path which can be used in contradiction extraction ranking. Consider that the values of stored ppmi's are summed with 1 based on paper details.
 
 ### extract contradictory pairs
 to extracting contradictory sentence pairs run following command

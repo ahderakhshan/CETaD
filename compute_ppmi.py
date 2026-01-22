@@ -72,7 +72,7 @@ if __name__ == "__main__":
         os.makedirs(args.output_path)
     np.save(f"{args.output_path}/terms.pkl", terms)
     logger.info(f"terms saved in {args.output_path}/terms.pkl")
-    np.save(f"{args.output_path}/pmi.pkl", pmi)
+    np.save(f"{args.output_path}/ppmi.pkl", pmi)
     logger.info(f"pmi saved in {args.output_path}/pmi.pkl")
 
 
