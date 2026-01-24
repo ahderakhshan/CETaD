@@ -4,6 +4,8 @@ import torch
 import tqdm
 import logging
 import torch.nn.functional as F
+from nltk.stem import PorterStemmer
+from nltk.tokenize import word_tokenize
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -53,8 +55,9 @@ class RepresentativePointSelector:
 
 
 class ContradictionExtractor2:
-    def __init__(self, siamese_model, embeddings, sentences, representative_point_selector: RepresentativePointSelector, terms_pickle_path,
-                 pmi_pickle_path, output_path, e_th=0.5, c_th=0.5, similarity_sort=False,
+    def __init__(self, siamese_model, embeddings, sentences, representative_point_selector: RepresentativePointSelector,
+                 terms_pickle_path, pmi_pickle_path, output_path, terms_contradiction_path, ppmi_contradiction_path,
+                 terms_entailment_path, ppmi_entailment_path, e_th=0.5, c_th=0.5, similarity_sort=False,
                  similarity_sort_model="Jaccard", impc_sort=False, impe_sort=False):
         self.siamese_model = siamese_model
         self.embeddings = embeddings
@@ -73,8 +76,15 @@ class ContradictionExtractor2:
         if self.similarity_sort and similarity_sort_model != "Jaccard":
             self.similarity_sort_model = SentenceTransformer(similarity_sort_model)
             logger.info("semantic similarity model loaded successfully")
+        self.terms_contradiction = np.load(terms_contradiction_path, allow_pickle=True)
+        self.ppmi_contradiction = np.load(ppmi_contradiction_path, allow_pickle=True)
+        self.terms_entailment = np.load(terms_entailment_path, allow_pickle=True)
+        self.ppmi_entailment = np.load(ppmi_entailment_path, allow_pickle=True)
         self.impc_sort = impc_sort
         self.impe_sort = impe_sort
+        self.impc_cache = {}
+        self.impe_cache = {}
+        self.stemmr = PorterStemmer()
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
     def compute_probability_with_rep_point(self):
@@ -108,6 +118,82 @@ class ContradictionExtractor2:
         logger.info(f"Number of extracted sentence pairs: {no_extracted_pairs}")
         return points_data_status
 
+    @staticmethod
+    def jaccard_sim(text1, text2):
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+        intersection = len(words1.intersection(words2))
+        union = len(words1.union(words2))
+        return float(intersection) / union
+
+    def lemmatize_text(self, sentence):
+        words = word_tokenize(sentence)
+        stems = [self.stemmr.stem(w) for w in words]
+        result = ""
+        for stem in stems:
+            result += stem + " "
+        return result.strip()
+
+    def compute_impc(self, sentence, c_index):
+        try:
+            return self.impc_cache[c_index]
+        except:
+            text = self.lemmatize_text(sentence)
+            words = text.split(" ")
+            sum_pmi = 0
+            for word in words:
+                try:
+                    sum_pmi += self.ppmi_contradiction[np.where(self.terms_contradiction == word)[0]][0]
+                except:
+                    sum_pmi += 1
+            self.impc_cache[c_index] = len(words) / sum_pmi
+            return len(words) / sum_pmi
+
+    def compute_impe(self, sentence, e_index):
+        try:
+            return self.impe_cache[e_index]
+        except:
+            text = self.lemmatize_text(sentence)
+            words = text.split(" ")
+            sum_pmi = 0
+            for word in words:
+                try:
+                    sum_pmi += self.ppmi_entailment[np.where(self.terms_entailment == word)[0]][0]
+                except:
+                    sum_pmi += 1
+            self.impc_cache[e_index] = len(words) / sum_pmi
+            return len(words) / sum_pmi
+
+    def _sort_pairs(self, pairs):
+        if not (self.similarity_sort or self.impe_sort or self.impc_sort):
+            return pairs
+        e_indexes = [pair[0] for pair in pairs]
+        c_indexes = [pair[1] for pair in pairs]
+        if self.similarity_sort and self.similarity_sort_model != "Jaccard":
+            sentence_embeddings = self.similarity_sort_model.encode(self.sentences, show_progress_bar=True, convert_to_tensor=True)
+            i_idx = torch.tensor(e_indexes, device=self.device)
+            j_idx = torch.tensor(c_indexes, device=self.device)
+            emb_i = sentence_embeddings[i_idx]
+            emb_j = sentence_embeddings[j_idx]
+            sims = emb_i @ emb_j.T
+        pairs_status = np.zeros((len(pairs), 5)) # entailment_index, contradiction_index, similarity, impc, impe
+        pair_counter = 0
+        for e_counter, e_index in enumerate(e_indexes):
+            for c_counter, c_index in enumerate(c_indexes):
+                similarity, impc, impe = 0, 0, 0
+                if self.similarity_sort and self.similarity_sort_model != "Jaccard":
+                    similarity = sims[e_counter, c_counter].item()
+                elif self.similarity_sort_model:
+                    similarity = self.jaccard_sim(self.sentences[e_index], self.sentences[c_index])
+
+                if self.impc_sort:
+                    impc = self.compute_impc(self.sentences[c_index])
+                if self.impe_sort:
+                    impe = self.compute_impe(self.sentences[e_index])
+                pairs_status[pair_counter] = [e_index, c_index, similarity, impc, impe]
+
+        return pairs_status
+
     def extract_contradictory_pairs(self):
         points_data_status = self.construct_entailment_and_contradiction_sets()
         pairs = set()
@@ -117,4 +203,6 @@ class ContradictionExtractor2:
             for e_number in point_entailments:
                 for c_number in point_contradictions:
                     pairs.add((e_number, c_number))
+        pairs_scores = self._sort_pairs(pairs)
+        pairs = sorted(pairs_scores, key=lambda x: x[2] + x[3] + x[4], reverse=True)
         return pairs
