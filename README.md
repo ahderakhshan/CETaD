@@ -5,7 +5,7 @@ This is the implementation of the paper CETaD: Contradiction Extraction from Tex
 
 
 ## Overview
-![](./CEMAT.png)
+![](./cemat.png)
 
 ### siamese network training
 
