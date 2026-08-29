@@ -5,7 +5,7 @@ This is the implementation of the paper CETaD: Contradiction Extraction from Tex
 
 
 ## Overview
-![Architecture of CEMaT: 1- Siamese Network is trained on NLI datasets. 2- Medical Texts Filtered by name of Drug/Disease 3- Using trained siamese network retrieved texts covert to their embeddings 4- Select representative points](./cemat.png)
+![](./cemat.png)
 
 ### siamese network training
 
