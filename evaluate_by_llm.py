@@ -4,6 +4,7 @@ import torch
 from siamese_network.siames_model import SiameseMLMClassifier
 from extract_contradiction.ContradictionExtractor import RepresentativePointSelector, ContradictionExtractor
 from extract_contradiction.DataReader import DataReader
+from Evaluators.Evaluators import EvaluateByLLM
 
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -51,6 +52,10 @@ class ArgumentManager:
         self.parser.add_argument("--similarity_sort_model", type=str, default="Jaccard")
         self.parser.add_argument("--sort_by_impc", type=bool, default=False)
         self.parser.add_argument("--sort_by_impe", type=bool, default=False)
+        self.parser.add_argument("--top_n", type=int, default=100, help="evaluate on top_n extractions")
+        self.parser.add_argument("--llm_model", type=str, default="gpt-4o-mini",
+                                 help="gpt model name for evaluate extractions")
+        self.parser.add_argument("--api_key", type=str, help="Your OpenAI api key")
 
     def parse(self):
         return self.parser.parse_args()
@@ -89,6 +94,9 @@ if __name__ == "__main__":
         impc_sort=args.sort_by_impc,
         impe_sort=args.sort_by_impe
     )
-    logger.info("start extracting contradictory sentences and probabilites")
-    contradictions = contradiction_extractor.evaluate_by_siamese()
-    logging.info("complete!")
+    extracted_pairs = contradiction_extractor.extract_contradictory_pairs()
+    extracted_pairs = extracted_pairs[:args.top_n]
+    evaluator = EvaluateByLLM(sentences, extracted_pairs, args.llm_model, args.api_key)
+    responses = evaluator.evaluate()
+    logger.info(f"responses from llm are {responses}\n number of Yes is {len([_ for _ in responses if _.lower() == 'yes'])}")
+

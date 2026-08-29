@@ -1,17 +1,18 @@
 import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoConfig
+from transformers import AutoModel, AutoConfig, AutoTokenizer
 from tqdm import tqdm
 
 
-class SiameseBertClassifier(nn.Module):
-    def __init__(self, pretrained_model='bert-base-uncased', no_unfreeze_layer=4, mlp_number_of_neurons=[128, 64],
+class SiameseMLMClassifier(nn.Module):
+    def __init__(self, mlm_model='roberta-large', no_unfreeze_layer=6, mlp_number_of_neurons=[128, 64],
                  dropout_rate=0.2, num_labels=3):
-        super(SiameseBertClassifier, self).__init__()
-        self.model = AutoModel.from_pretrained(pretrained_model)
-        config = AutoConfig.from_pretrained(pretrained_model)
+        super(SiameseMLMClassifier, self).__init__()
+        self.model = AutoModel.from_pretrained(mlm_model)
+        self.tokenizer = AutoTokenizer.from_pretrained(mlm_model)
+        config = AutoConfig.from_pretrained(mlm_model)
 
-        # we just fine tune last 4 layers of BERT model to avoid overfitting
+        # we just fine tune last 6 layers of RoBERTa model to avoid overfitting
         for param in self.model.parameters():
             param.requires_grad = False
         for i in range(config.num_hidden_layers - no_unfreeze_layer, config.num_hidden_layers):
@@ -42,13 +43,13 @@ class SiameseBertClassifier(nn.Module):
 
         return self.classifier(combined)
 
-    def embedd_sentences(self, sentences, tokenizer, max_length):
+    def embedd_sentences(self, sentences, max_length):
         all_embeddings = []
         batch_size = 2
         device = "cuda" if torch.cuda.is_available() else "cpu"
         for i in tqdm(range(0, len(sentences), batch_size)):
             selected_sentences = sentences[i:i + batch_size]
-            selected_tokens = tokenizer(selected_sentences, return_tensors="pt", truncation=True, padding=True,
+            selected_tokens = self.tokenizer(selected_sentences, return_tensors="pt", truncation=True, padding=True,
                                         max_length=max_length).to(device)
             with torch.no_grad():
                 outputs = self.model(**selected_tokens)

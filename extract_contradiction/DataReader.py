@@ -16,7 +16,8 @@ class DataReader:
             documents = [data["hits"][i]["ABSTRACT"] for i in range(len(data["hits"]))]
         return documents
 
-    def retrieve_sentences(self):
+    @property
+    def sentences(self):
         documents = self.read_documents()
         all_sentences = []
         for abstract in documents:

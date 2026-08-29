@@ -3,7 +3,7 @@ from siamese_network.provide_data import DataProvider, NLIDataset
 from transformers import AutoTokenizer
 import torch
 from torch.utils.data import DataLoader
-from siamese_network.siames_model import SiameseBertClassifier
+from siamese_network.siames_model import SiameseMLMClassifier
 from torch.optim import AdamW
 from siamese_network.utils import train
 import os
@@ -73,8 +73,8 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=args.test_batch_size, shuffle=False)
 
-    model = SiameseBertClassifier(
-        pretrained_model=args.model_name_or_path,
+    model = SiameseMLMClassifier(
+        mlm_model=args.model_name_or_path,
         no_unfreeze_layer=args.no_unfreeze_layer,
         mlp_number_of_neurons=args.MLP_number_of_neurons,
         dropout_rate=args.dropout_rate,

@@ -5,3 +5,4 @@ datasets
 nltk
 numpy
 scikit-learn
+openai

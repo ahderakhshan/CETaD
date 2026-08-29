@@ -3,7 +3,8 @@ import argparse
 import torch
 from siamese_network.siames_model import SiameseMLMClassifier
 from extract_contradiction.ContradictionExtractor import RepresentativePointSelector, ContradictionExtractor
-from extract_contradiction.DataReader import DataReader
+import pickle
+from Evaluators.Evaluators import EvaluateByFactCheckingCorpus
 
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -16,8 +17,8 @@ class ArgumentManager:
         self._add_arguments()
 
     def _add_arguments(self):
-        self.parser.add_argument("--data_path", type=str, default="./data/texts.json",
-                                 help="path to sentences for extracting contradictory pairs."
+        self.parser.add_argument("--data_path", type=str, default="./created_corpus",
+                                 help="path to created corpus files which must contains 3 .pkl files."
                                       " change utils.read_input_data function based on your data type")
         self.parser.add_argument("--checkpoint_path", type=str, default="./checkpoint/checkpoint.pt",
                                  help="siamese language model that fine tuned to generate NLI specific embeddings")
@@ -51,6 +52,7 @@ class ArgumentManager:
         self.parser.add_argument("--similarity_sort_model", type=str, default="Jaccard")
         self.parser.add_argument("--sort_by_impc", type=bool, default=False)
         self.parser.add_argument("--sort_by_impe", type=bool, default=False)
+        self.parser.add_argument("--top_n", type=int, default=100, help="evaluate on top_n retrieval after sorting")
 
     def parse(self):
         return self.parser.parse_args()
@@ -72,7 +74,12 @@ if __name__ == "__main__":
                                                                 optimizer_iterations=args.rep_point_optimizer_iterations,
                                                                 optimizer_learning_rate=args.rep_point_optimizer_learning_rate,
                                                                 alpha=args.alpha, beta=args.beta)
-    sentences = DataReader(data_path=args.data_path).sentences
+    with open(f"{args.data_path}/all_sentences.pkl", "rb") as f:
+        sentences = pickle.load(f)
+    with open(f"{args.data_path}/all_names.pkl", "rb") as f:
+        names = pickle.load(f)
+    with open(f"{args.data_path}/all_contradictory_relations.pkl", "rb") as f:
+        contradictory_relation = pickle.load(f)
     contradiction_extractor = ContradictionExtractor(
         siamese_model=siamese_model,
         tokenizer_max_length=args.tokenizer_max_length,
@@ -90,5 +97,11 @@ if __name__ == "__main__":
         impe_sort=args.sort_by_impe
     )
     logger.info("start extracting contradictory sentences and probabilites")
-    contradictions = contradiction_extractor.evaluate_by_siamese()
-    logging.info("complete!")
+    points_data_status = contradiction_extractor.construct_entailment_and_contradiction_sets()
+    extracted_pairs = contradiction_extractor.extract_contradictory_pairs()
+    all_extractions, true_extractions = EvaluateByFactCheckingCorpus(sentences, names, contradictory_relation, points_data_status, args.top_n).evaluate()
+    logger.info(f"""Results:
+    all extractions: {all_extractions}
+    true extractions: {true_extractions}
+    n: {args.top_n}""")
+
